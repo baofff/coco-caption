@@ -88,16 +88,11 @@ class COCOEvalCap:
 
 from json import encoder
 encoder.FLOAT_REPR = lambda o: format(o, '.3f')
-# set up file names and pathes
 
-annFile = 'annotations/captions_val2014.json'
-resFile = 'results/captions_val2014_fakecap_results.json'
-
-# download Stanford models
 
 # create coco object and cocoRes object
-coco = COCO('annotations/nocap_test_captions.json')
-cocoRes = coco.loadRes('annotations/nocap_human_baseline_captions.json')
+coco = COCO('annotations/captions_val2014.json')
+cocoRes = coco.loadRes('results/captions_val2014_fakecap_results.json')
 
 
 cocoEval = COCOEvalCap(coco, cocoRes)
