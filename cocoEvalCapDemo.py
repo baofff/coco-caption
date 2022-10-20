@@ -1,105 +1,54 @@
 
 from pycocoevalcap.tokenizer.ptbtokenizer import PTBTokenizer
 from pycocoevalcap.bleu.bleu import Bleu
-from pycocoevalcap.meteor.meteor import Meteor
-from pycocoevalcap.rouge.rouge import Rouge
-from pycocoevalcap.spice.spice import Spice
-from pycocotools.coco import COCO
 
 
-class COCOEvalCap:
-    def __init__(self, coco, cocoRes):
-        self.evalImgs = []
-        self.eval = dict()
-        self.imgToEval = dict()
-        self.coco = coco
-        self.cocoRes = cocoRes
-        self.params = {'image_id': coco.getImgIds()}
+def get_score(gts, res):
+    print('tokenization...')
+    tokenizer = PTBTokenizer()
+    gts = tokenizer.tokenize(gts)
+    res = tokenizer.tokenize(res)
 
-        self.gts = None
-        self.res = None
+    scorers = [
+        (Bleu(4), ["Bleu_1", "Bleu_2", "Bleu_3", "Bleu_4"]),
+    ]
 
-    def tokenize(self):
-        imgIds = self.params['image_id']
-        # imgIds = self.coco.getImgIds()
-        gts = dict()
-        res = dict()
-        for imgId in imgIds:
-            gts[imgId] = self.coco.imgToAnns[imgId]
-            res[imgId] = self.cocoRes.imgToAnns[imgId]
-
-        # =================================================
-        # Set up scorers
-        # =================================================
-        print('tokenization...')
-        tokenizer = PTBTokenizer()
-        self.gts  = tokenizer.tokenize(gts)
-        self.res = tokenizer.tokenize(res)
-
-    def evaluate(self):
-        self.tokenize()
-
-        # =================================================
-        # Set up scorers
-        # =================================================
-        print('setting up scorers...')
-        scorers = [
-            (Bleu(4), ["Bleu_1", "Bleu_2", "Bleu_3", "Bleu_4"]),
-            # (Meteor(),"METEOR"),
-            # (Rouge(), "ROUGE_L"),
-            # (Cider(self.df), "CIDEr"),
-            # (Spice(), "SPICE")
-        ]
-
-        # =================================================
-        # Compute scores
-        # =================================================
-        for scorer, method in scorers:
-            print('computing %s score...'%(scorer.method()))
-            score, scores = scorer.compute_score(self.gts, self.res)
-            if type(method) == list:
-                for sc, scs, m in zip(score, scores, method):
-                    self.setEval(sc, m)
-                    self.setImgToEvalImgs(scs, self.gts.keys(), m)
-                    print("%s: %0.3f"%(m, sc))
-            else:
-                self.setEval(score, method)
-                self.setImgToEvalImgs(scores, self.gts.keys(), method)
-                print("%s: %0.3f"%(method, score))
-        self.setEvalImgs()
-
-    def setEval(self, score, method):
-        self.eval[method] = score
-
-    def setImgToEvalImgs(self, scores, imgIds, method):
-        for imgId, score in zip(imgIds, scores):
-            if not imgId in self.imgToEval:
-                self.imgToEval[imgId] = dict()
-                self.imgToEval[imgId]["image_id"] = imgId
-            self.imgToEval[imgId][method] = score
-
-    def setEvalImgs(self):
-        self.evalImgs = [eval for imgId, eval in self.imgToEval.items()]
+    eval = {}
+    for scorer, method in scorers:
+        print('computing %s score...'%(scorer.method()))
+        score, scores = scorer.compute_score(gts, res)
+        if type(method) == list:
+            for sc, scs, m in zip(score, scores, method):
+                eval[m] = sc
+        else:
+            eval[method] = score
+    return eval
 
 
+gts = {
+    28377: [{'image_id': 28377, 'caption': 'A street with various buildings on each side and a clock tower.'},
+            {'image_id': 28377, 'caption': 'A narrow lane has buildings on either side and one of the buildings is yellow and another is yellow and white.'},
+            {'image_id': 28377, 'id': 314546, 'caption': 'There is a church at the end of the street.'},
+            {'image_id': 28377, 'id': 314579, 'caption': 'An alley way of a church and buildings with balconies'},
+            {'image_id': 28377, 'id': 317669, 'caption': 'A city street surrounded by tall colorful buildings.'}],
+    239448: [{'id': 584162, 'caption': 'Two men standing on a very tall clock tower with a white clock and two thermometers.'},
+             {'id': 584702, 'caption': 'Two cowboys statues are at the top of a tower. '},
+             {'image_id': 239448, 'id': 586526, 'caption': 'Tower clock designed with two western shooters for entertainment display'},
+             {'caption': 'a clock with two gunman from the old west'},
+             {'image_id': 239448, 'caption': 'A clock tower with two statues of cowboys on it '}],
+    558524: [{'image_id': 558524, 'id': 612929, 'caption': 'The large, very old jar is on display behind glass.'},
+             {'caption': 'An intricately designed vase is shown in a glass case.'},
+             {'image_id': 558524, 'caption': 'Detailed vase on display on a white pedestal. '},
+             {'image_id': 558524, 'id': 613901, 'caption': 'A vase sitting on a small table as a display in a room '},
+             {'image_id': 558524, 'id': 615227, 'caption': 'A brown and gold antique vase being displayed.'}],
+}
 
 
+res = {
+    28377: [{'caption': 'large clock tower in front of a building'}],
+    239448: [{'image_id': 239448, 'caption': 'clock tower with a clock on the side of a building'}],
+    558524: [{'caption': 'white and white vase that is sitting on top of a table'}],
+}
 
 
-from json import encoder
-encoder.FLOAT_REPR = lambda o: format(o, '.3f')
-
-
-# create coco object and cocoRes object
-coco = COCO('annotations/captions_val2014.json')
-cocoRes = coco.loadRes('results/captions_val2014_fakecap_results.json')
-
-
-cocoEval = COCOEvalCap(coco, cocoRes)
-
-cocoEval.params['image_id'] = cocoRes.getImgIds()
-
-cocoEval.evaluate()
-
-for metric, score in cocoEval.eval.items():
-    print('%s: %.3f'%(metric, score))
+print(get_score(gts, res))
